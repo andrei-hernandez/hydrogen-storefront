@@ -14,7 +14,7 @@ export async function loader({context}: LoaderFunctionArgs) {
   }
 
   const response = await fetch(
-    `http://localhost:4000/api/favorites/${
+    `${context.env.PUBLIC_FAVORITES_MS_API_URL}/api/favorites/${
       customerData.customer.id.split('/')[3]
     }`,
     {
