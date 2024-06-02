@@ -25,6 +25,14 @@ export async function loader({context}: LoaderFunctionArgs) {
     },
   );
 
+  if (!response.ok) {
+    throw new Error(
+      `Customer favorites not found ${response.url} | ${
+        response.status
+      } | ${await response.text()}`,
+    );
+  }
+
   const favoritesData: Favorite[] = (await response.json()) as Favorite[];
 
   if (!response.ok) {
