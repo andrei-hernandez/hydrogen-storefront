@@ -88,6 +88,7 @@ export default {
           session,
           storefront,
           customerAccount,
+          debug: 'debug',
           cart,
           env,
           waitUntil,

@@ -1,0 +1,17 @@
+type Query {
+  favorites(accountId: ID!): [Favorite]
+}
+
+type Favorite {
+  id: ID!
+  accountId: ID!
+  productId: ID!
+}
+
+query CustomerFavorites($accountId: ID!) {
+  favorites(accountId: $accountId) {
+    id
+    accountId
+    productId 
+  }
+}

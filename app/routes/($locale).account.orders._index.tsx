@@ -88,7 +88,7 @@ function EmptyOrders() {
       <p>You haven&apos;t placed any orders yet.</p>
       <br />
       <p>
-        <Link to="/collections">Start Shopping →</Link>
+        <Link to="/collections/all">Start Shopping →</Link>
       </p>
     </div>
   );

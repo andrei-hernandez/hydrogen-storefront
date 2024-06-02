@@ -1,11 +1,17 @@
-import {Suspense} from 'react';
-import {defer, redirect, type LoaderFunctionArgs} from '@shopify/remix-oxygen';
+import React, {Suspense} from 'react';
+import {
+  defer,
+  redirect,
+  type LoaderFunctionArgs,
+  json,
+} from '@shopify/remix-oxygen';
 import {
   Await,
   Link,
   useLoaderData,
   type MetaFunction,
   type FetcherWithComponents,
+  Form,
 } from '@remix-run/react';
 import type {
   ProductFragment,
@@ -25,6 +31,8 @@ import type {
   SelectedOption,
 } from '@shopify/hydrogen/storefront-api-types';
 import {getVariantUrl} from '~/lib/variants';
+import {CUSTOMER_DETAILS_QUERY} from '~/graphql/customer-account/CustomerDetailsQuery';
+import type {HTMLFormMethod} from '@remix-run/router';
 
 export const meta: MetaFunction<typeof loader> = ({data}) => {
   return [{title: `Hydrogen | ${data?.product.title ?? ''}`}];
@@ -74,7 +82,103 @@ export async function loader({params, request, context}: LoaderFunctionArgs) {
     variables: {handle},
   });
 
-  return defer({product, variants});
+  const {data: customerData, errors: customerErrors} =
+    await context.customerAccount.query(CUSTOMER_DETAILS_QUERY);
+
+  if (customerErrors?.length || !customerData?.customer) {
+    throw new Error('Customer not found');
+  }
+
+  const response = await fetch(
+    `${context.env.PUBLIC_FAVORITES_MS_API_URL}/api/favorites/${
+      customerData.customer.id.split('/')[3]
+    }`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-type': 'application/json',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error('Customer favorites not found');
+  }
+
+  const favorites: Favorite[] = (await response.json()) as Favorite[];
+
+  return defer({
+    product,
+    variants,
+    favorites: favorites.map((favorite) => favorite.productId),
+    customerId: customerData.customer.id.split('/')[4],
+  });
+}
+
+export async function action({request, context}: LoaderFunctionArgs) {
+  if (request.method === 'DELETE') {
+    const values = await request.formData();
+
+    const response = await fetch(
+      `${context.env.PUBLIC_FAVORITES_MS_API_URL}/api/favorites/${values.get(
+        'productId',
+      )}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-type': 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to remove favorite');
+    }
+
+    return json(
+      {},
+      {
+        headers: {
+          'Set-Cookie': await context.session.commit(),
+        },
+      },
+    );
+  }
+
+  if (request.method === 'POST') {
+    const values = await request.formData();
+    const productId = values.get('productId');
+    const customerId = values.get('customerId');
+    const productTitle = values.get('productTitle');
+
+    const response = await fetch(
+      `${context.env.PUBLIC_FAVORITES_MS_API_URL}/api/favorites`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId,
+          clientId: customerId,
+          name: productTitle,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to add favorite');
+    }
+
+    return json(
+      {},
+      {
+        headers: {
+          'Set-Cookie': await context.session.commit(),
+        },
+      },
+    );
+  }
 }
 
 function redirectToFirstVariant({
@@ -101,7 +205,8 @@ function redirectToFirstVariant({
 }
 
 export default function Product() {
-  const {product, variants} = useLoaderData<typeof loader>();
+  const {product, variants, favorites, customerId} =
+    useLoaderData<typeof loader>();
   const {selectedVariant} = product;
   return (
     <div className="product">
@@ -110,6 +215,8 @@ export default function Product() {
         selectedVariant={selectedVariant}
         product={product}
         variants={variants}
+        favorites={favorites}
+        customerId={customerId}
       />
     </div>
   );
@@ -136,10 +243,14 @@ function ProductMain({
   selectedVariant,
   product,
   variants,
+  favorites,
+  customerId,
 }: {
   product: ProductFragment;
   selectedVariant: ProductFragment['selectedVariant'];
   variants: Promise<ProductVariantsQuery>;
+  favorites: string[];
+  customerId: string;
 }) {
   const {title, descriptionHtml} = product;
   return (
@@ -153,6 +264,8 @@ function ProductMain({
             product={product}
             selectedVariant={selectedVariant}
             variants={[]}
+            favorites={favorites}
+            customerId={customerId}
           />
         }
       >
@@ -165,6 +278,8 @@ function ProductMain({
               product={product}
               selectedVariant={selectedVariant}
               variants={data.product?.variants.nodes || []}
+              favorites={favorites}
+              customerId={customerId}
             />
           )}
         </Await>
@@ -210,10 +325,14 @@ function ProductForm({
   product,
   selectedVariant,
   variants,
+  favorites,
+  customerId,
 }: {
   product: ProductFragment;
   selectedVariant: ProductFragment['selectedVariant'];
   variants: Array<ProductVariantFragment>;
+  favorites: string[];
+  customerId: string;
 }) {
   return (
     <div className="product-form">
@@ -225,25 +344,69 @@ function ProductForm({
         {({option}) => <ProductOptions key={option.name} option={option} />}
       </VariantSelector>
       <br />
-      <AddToCartButton
-        disabled={!selectedVariant || !selectedVariant.availableForSale}
-        onClick={() => {
-          window.location.href = window.location.href + '#cart-aside';
-        }}
-        lines={
-          selectedVariant
-            ? [
-                {
-                  merchandiseId: selectedVariant.id,
-                  quantity: 1,
-                },
-              ]
-            : []
-        }
-      >
-        {selectedVariant?.availableForSale ? 'Add to cart' : 'Sold out'}
-      </AddToCartButton>
+      <div className="product-buttons">
+        <AddToCartButton
+          disabled={!selectedVariant || !selectedVariant.availableForSale}
+          onClick={() => {
+            window.location.href = window.location.href + '#cart-aside';
+          }}
+          lines={
+            selectedVariant
+              ? [
+                  {
+                    merchandiseId: selectedVariant.id,
+                    quantity: 1,
+                  },
+                ]
+              : []
+          }
+        >
+          {selectedVariant?.availableForSale ? 'Add to cart' : 'Sold out'}
+        </AddToCartButton>
+        {favorites?.includes(product.id.split('/')[4]) ? (
+          <AddToFavoritesButton
+            method="DELETE"
+            productId={product.id.split('/')[4]}
+            customerId={customerId}
+            textContent="Remove favorite"
+            productTitle={product.title}
+          />
+        ) : (
+          <AddToFavoritesButton
+            method="POST"
+            productId={product.id.split('/')[4]}
+            customerId={customerId}
+            textContent="Add to favorites"
+            productTitle={product.title}
+          />
+        )}
+      </div>
     </div>
+  );
+}
+
+function AddToFavoritesButton({
+  method,
+  productId,
+  customerId,
+  textContent,
+  productTitle,
+}: {
+  method: HTMLFormMethod;
+  productId: string;
+  customerId: string;
+  textContent: string;
+  productTitle: string;
+}) {
+  return (
+    <Form method={method}>
+      <input type="hidden" name="productId" value={productId} />
+      <input type="hidden" name="productTitle" value={productTitle} />
+      <input type="hidden" name="customerId" value={customerId} />
+      <button type="submit" className="product-button">
+        {textContent}
+      </button>
+    </Form>
   );
 }
 
@@ -301,6 +464,7 @@ function AddToCartButton({
           <button
             type="submit"
             onClick={onClick}
+            className="product-button"
             disabled={disabled ?? fetcher.state !== 'idle'}
           >
             {children}

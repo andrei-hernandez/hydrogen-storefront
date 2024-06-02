@@ -71,6 +71,10 @@ function AccountMenu() {
         &nbsp; Profile &nbsp;
       </NavLink>
       &nbsp;|&nbsp;
+      <NavLink to="/account/favorites" style={isActiveStyle}>
+        &nbsp; Favorites &nbsp;
+      </NavLink>
+      &nbsp;|&nbsp;
       <NavLink to="/account/addresses" style={isActiveStyle}>
         &nbsp; Addresses &nbsp;
       </NavLink>
