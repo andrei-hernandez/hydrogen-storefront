@@ -28,16 +28,29 @@ Hydrogen is Shopify’s stack for headless commerce. Hydrogen is designed to dov
 npm create @shopify/hydrogen@latest
 ```
 
+**Additional environment:**
+```
+PUBLIC_FAVORITES_MS_API_URL="your-favorites-ms-api-url"
+```
+
+## Local development
+**Link your Hydrogen project to a Shopify store:**
+```bash
+npx shopify hydrogen link
+```
+**Pull the environment variables from your Shopify store:**
+```bash
+npx shopify hydrogen env pull
+```
+**Start the development server with customer account API:**
+```bash
+npx shopify hydrogen dev --customer-account-push__unstable
+```
+
 ## Building for production
 
 ```bash
 npm run build
-```
-
-## Local development
-
-```bash
-npm run dev
 ```
 
 ## Setup for using Customer Account API (`/account` section)

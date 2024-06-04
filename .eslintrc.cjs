@@ -15,4 +15,9 @@ module.exports = {
     '@typescript-eslint/no-non-null-asserted-optional-chain': 'off',
     'no-case-declarations': 'off',
   },
+  settings: {
+    jest: {
+      "version": 26
+    }
+  },
 };

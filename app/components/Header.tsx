@@ -1,5 +1,5 @@
 import {Await, NavLink} from '@remix-run/react';
-import {Suspense} from 'react';
+import React, {Suspense} from 'react';
 import type {HeaderQuery} from 'storefrontapi.generated';
 import type {LayoutProps} from './Layout';
 import {useRootLoaderData} from '~/lib/root-data';
